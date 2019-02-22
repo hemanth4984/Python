@@ -1,0 +1,70 @@
+import time
+import boto3
+from boto3.dynamodb.conditions import Key, Attr
+from datetime import datetime, timedelta
+#No of days. You can change the based on your requirement
+days = 10 
+dynamodb = boto3.resource('dynamodb',  aws_access_key_id='AKIAJEIUPJDMIP6EHH6A',
+   aws_secret_access_key = "dKBVox9AtyUwVKRTb/7jgYJ+h2jjQNUz84KzWy3/",region_name = "ap-south-1"
+)
+first_table(days, dynamodb)
+second_table(days, dynamodb)
+def first_table(days, dynamodb):
+	table = dynamodb.Table('shorelogs')
+	milliseconds = round(time.time()*1000)
+	diff = round(days*24*60*60*1000)
+	time_period = str(milliseconds - diff)
+	response = table.scan(FilterExpression = Key("logtimestamp").lt(time_period), Limit = 100)
+	data = response['Items']
+	if len(data) == 0:
+		print("REPORT : There is no items less than "+str(days)+" days in your table.")
+	count = 0
+	for item in data:
+		if table.delete_item(
+		Key={
+			'logtimestamp': item["logtimestamp"]
+		}):
+			count += 1
+			print ("Deleted item nO:" + str(count))
+	while 'LastEvaluatedKey' in response:
+		response = table.scan(FilterExpression = Key("logtimestamp").lt(time_period),ExclusiveStartKey=response['LastEvaluatedKey'], Limit = 100)
+		data = response['Items']
+		for item in data:
+			if table.delete_item(
+				Key={
+				'logtimestamp': item["logtimestamp"]
+				}):
+				count += 1
+				print ("Deleted item nO:" + str(count))
+
+#Seconda table
+def second_table(days, dynamodb):
+	table = dynamodb.Table('newshoredocstore')
+	start_date = datetime.now()
+	diff =  start_date - timedelta(days= days)
+	time_period = diff.strftime ("%Y-%m-%d")
+	print(time_period)
+	response = table.scan(FilterExpression = Attr("entrydatetime").lt(time_period), Limit = 100)
+	data = response['Items']
+	if len(data) == 0:
+		print("REPORT : There is no items less than "+str(days)+" days in your table.")
+	count = 0
+	for item in data:
+		if table.delete_item(
+		Key={
+			'uniqueidentifier': item["uniqueidentifier"],
+			'entrydatetime' : item['entrydatetime'] 
+		}):
+			count += 1
+			print ("Deleted item nO:" + str(count))
+	while 'LastEvaluatedKey' in response:
+		response = table.scan(FilterExpression = Attr("entrydatetime").lt(time_period),ExclusiveStartKey=response['LastEvaluatedKey'], Limit = 100)
+		data = response['Items']
+		for item in data:
+			if table.delete_item(
+				Key={
+				'uniqueidentifier': item["uniqueidentifier"],
+					'entrydatetime' : item['entrydatetime'] 
+				}):
+				count += 1
+				print ("Deleted item nO:" + str(count))
